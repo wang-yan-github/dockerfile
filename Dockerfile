@@ -4,11 +4,11 @@ FROM maven:3.8.6-openjdk-8-slim AS builder
 # 安装 git
 RUN apt-get update && apt-get install -y git
 
-# 设置工作目录
+# 设置工作目录为 /gateway
 WORKDIR /gateway
 
-# 从 GitHub 克隆代码
-RUN git clone https://github.com/wang-yan-github/gateway.git
+# 从 GitHub 克隆代码（将代码直接克隆到工作目录）
+RUN git clone https://github.com/wang-yan-github/gateway.git .
 
 # 构建项目
 RUN mvn clean install -DskipTests
@@ -16,7 +16,7 @@ RUN mvn clean install -DskipTests
 # 使用官方的 Java 基础镜像作为运行环境
 FROM openjdk:8-jre-slim
 
-# 将构建好的 jar 文件复制到新的容器中
+# 将构建好的 jar 文件从 builder 镜像中复制到当前镜像的 /app 目录
 COPY --from=builder /gateway/target/gateway-0.0.1.jar /app/gateway-0.0.1.jar
 
 # 设置工作目录
