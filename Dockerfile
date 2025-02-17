@@ -4,6 +4,9 @@ FROM maven:3.8.6-openjdk-8-slim AS builder
 # 设置工作目录
 WORKDIR /app
 
+# 安装 git
+RUN apt-get update && apt-get install -y git
+
 # 从 GitHub 克隆代码（替换为你自己的 GitHub 仓库）
 RUN git clone https://github.com/wang-yan-github/gateway.git
 
