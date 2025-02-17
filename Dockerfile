@@ -13,6 +13,9 @@ RUN git clone https://github.com/wang-yan-github/gateway.git .
 # 构建项目
 RUN mvn clean install -DskipTests
 
+# 列出 /gateway/target 目录中的文件，确认 JAR 文件存在
+RUN ls -l /gateway/target
+
 # 使用官方的 Java 基础镜像作为运行环境
 FROM openjdk:8-jre-slim
 
