@@ -1,26 +1,43 @@
-# 使用官方的 Maven 镜像进行构建
-FROM maven:3.8.6-openjdk-8-slim AS builder
+# 构建阶段
+FROM maven:3.8.6-eclipse-temurin-8-alpine AS builder
 
-# 设置工作目录为 /gateway
-WORKDIR /gateway
+WORKDIR /build
+RUN git clone -b main --depth 1 https://github.com/wang-yan-github/gateway.git . \
+    && mvn package -DskipTests -T 1C
+# 先复制POM文件利用缓存
+COPY pom.xml .
+# 下载依赖（保持这步独立以利用Docker缓存）
+RUN mvn dependency:go-offline -B
 
-# 从 GitHub 克隆代码
-RUN git clone https://github.com/wang-yan-github/gateway.git .
+# 复制源代码
+COPY src ./src
 
-# 构建项目并跳过测试，优化构建
-RUN mvn clean install -DskipTests
+# 构建应用（使用并行构建并减少日志输出）
+RUN mvn package -DskipTests \
+    -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN \
+    -T 1C
 
-# 使用官方的 Java 基础镜像作为运行环境
-FROM openjdk:8-jre-slim
+# 运行阶段
+FROM eclipse-temurin:8-jre-alpine
 
-# 将构建好的 jar 文件从 builder 镜像中复制到当前镜像的 /app 目录
-COPY --from=builder /gateway/target/gateway-0.0.1.jar /app/gateway-0.0.1.jar
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache tzdata && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
 
-# 设置工作目录
+# 创建非特权用户
+RUN addgroup -S appuser && adduser -S appuser -G appuser
+
 WORKDIR /app
+# 复制构建产物并设置权限
+COPY --from=builder --chown=appuser:appuser /build/target/*.jar ./app.jar
 
-# 暴露端口（根据项目实际运行的端口调整）
+USER appuser
+
 EXPOSE 8080
 
-# 启动 Java 应用
-CMD ["java", "-jar", "gateway-0.0.1.jar"]
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
